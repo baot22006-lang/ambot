@@ -1,108 +1,130 @@
---// AIMBOT NPC + PLAYER | BLOX FRUITS
---// By ChatGPT (Template)
+--// CIRCULAR AIMBOT MENU | BẢO ĐẸP TRAI
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
---// SETTINGS
-local Settings = {
+--// CONFIG
+local Config = {
     Enabled = false,
     AimNPC = true,
     AimPlayer = false,
-    MaxDistance = 500,
-    AimPart = "HumanoidRootPart"
+    Smooth = 0.1,
+    HoldKey = Enum.UserInputType.MouseButton2,
+    MaxDistance = 600
 }
 
 --// GUI
 local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "AimbotGui"
+gui.Name = "BaoDepTraiMenu"
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,200,0,180)
-frame.Position = UDim2.new(0,20,0,200)
-frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-frame.Active = true
-frame.Draggable = true
+local circle = Instance.new("Frame", gui)
+circle.Size = UDim2.new(0,140,0,140)
+circle.Position = UDim2.new(0,60,0,250)
+circle.BackgroundColor3 = Color3.fromRGB(30,30,30)
+circle.Active = true
+circle.Draggable = true
 
-local function Button(text, posY, callback)
-    local b = Instance.new("TextButton", frame)
-    b.Size = UDim2.new(1,-10,0,35)
-    b.Position = UDim2.new(0,5,0,posY)
+local uic = Instance.new("UICorner", circle)
+uic.CornerRadius = UDim.new(1,0) -- TRÒN
+
+--// TITLE
+local title = Instance.new("TextLabel", circle)
+title.Size = UDim2.new(1,0,0,30)
+title.Position = UDim2.new(0,0,0,5)
+title.Text = "Bảo đẹp trai"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(255,215,0)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+
+--// BUTTON MAKER
+local function MakeBtn(text, y)
+    local b = Instance.new("TextButton", circle)
+    b.Size = UDim2.new(0,110,0,28)
+    b.Position = UDim2.new(0.5,-55,0,y)
     b.Text = text
-    b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    b.BackgroundColor3 = Color3.fromRGB(50,50,50)
     b.TextColor3 = Color3.new(1,1,1)
-    b.MouseButton1Click:Connect(callback)
+    b.Font = Enum.Font.Gotham
+    b.TextSize = 12
+    local c = Instance.new("UICorner", b)
+    c.CornerRadius = UDim.new(0,12)
+    return b
 end
 
-Button("AIMBOT : OFF", 5, function(self)
-    Settings.Enabled = not Settings.Enabled
-    self.Text = Settings.Enabled and "AIMBOT : ON" or "AIMBOT : OFF"
+local btnAim = MakeBtn("AIM : OFF", 40)
+local btnNPC = MakeBtn("NPC", 72)
+local btnPLR = MakeBtn("PLAYER", 104)
+
+btnAim.MouseButton1Click:Connect(function()
+    Config.Enabled = not Config.Enabled
+    btnAim.Text = Config.Enabled and "AIM : ON" or "AIM : OFF"
 end)
 
-Button("AIM NPC", 45, function()
-    Settings.AimNPC = true
-    Settings.AimPlayer = false
+btnNPC.MouseButton1Click:Connect(function()
+    Config.AimNPC = true
+    Config.AimPlayer = false
 end)
 
-Button("AIM PLAYER", 85, function()
-    Settings.AimPlayer = true
-    Settings.AimNPC = false
+btnPLR.MouseButton1Click:Connect(function()
+    Config.AimPlayer = true
+    Config.AimNPC = false
 end)
 
-Button("BUDDY X", 125, function()
-    -- ép dùng chiêu X
-    local tool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-    if tool then
-        tool:Activate()
-        game:GetService("VirtualInputManager"):SendKeyEvent(true,"X",false,game)
-        task.wait()
-        game:GetService("VirtualInputManager"):SendKeyEvent(false,"X",false,game)
-    end
-end)
+--// AIM LOGIC
+local function GetTarget()
+    local closest, dist = nil, Config.MaxDistance
 
---// GET NEAREST TARGET
-local function GetNearestTarget()
-    local nearest, dist = nil, Settings.MaxDistance
-
-    local function Check(model)
-        local hrp = model:FindFirstChild(Settings.AimPart)
-        local hum = model:FindFirstChild("Humanoid")
+    local function Check(char)
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChild("Humanoid")
         if hrp and hum and hum.Health > 0 then
             local d = (Camera.CFrame.Position - hrp.Position).Magnitude
             if d < dist then
                 dist = d
-                nearest = hrp
+                closest = hrp
             end
         end
     end
 
-    if Settings.AimPlayer then
+    if Config.AimPlayer then
         for _,p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
+            if p ~= LP and p.Character then
                 Check(p.Character)
             end
         end
     end
 
-    if Settings.AimNPC then
-        for _,m in pairs(workspace:GetDescendants()) do
+    if Config.AimNPC then
+        for _,m in pairs(workspace:GetChildren()) do
             if m:IsA("Model") and m:FindFirstChild("Humanoid") and not Players:GetPlayerFromCharacter(m) then
                 Check(m)
             end
         end
     end
 
-    return nearest
+    return closest
 end
 
---// AIM LOOP
+--// HOLD AIM
+local holding = false
+UIS.InputBegan:Connect(function(i)
+    if i.UserInputType == Config.HoldKey then holding = true end
+end)
+UIS.InputEnded:Connect(function(i)
+    if i.UserInputType == Config.HoldKey then holding = false end
+end)
+
+--// LOOP
 RunService.RenderStepped:Connect(function()
-    if not Settings.Enabled then return end
-    local target = GetNearestTarget()
+    if not Config.Enabled or not holding then return end
+    local target = GetTarget()
     if target then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+        local cam = Camera.CFrame
+        local aim = CFrame.new(cam.Position, target.Position)
+        Camera.CFrame = cam:Lerp(aim, Config.Smooth)
     end
 end)
